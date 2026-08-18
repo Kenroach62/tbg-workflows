@@ -1,0 +1,799 @@
+{
+  "name": "Approval webhook receiver - HubSpot Logging",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "approve-followup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "706fb74a-8889-4b70-a3cf-354a49db3ecf",
+      "name": "Webhook - Approve/Reject click",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1024,
+        224
+      ],
+      "webhookId": "approve-followup",
+      "notes": "This is a permanent, always-on webhook - unlike the old Wait node approach, this keeps working regardless of the main workflow's active/inactive state or whether any execution is still 'waiting'. This workflow itself must be ACTIVATED for the webhook URL to work."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $json.query.token }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "pending"
+            },
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Approve/Reject click').first().json.query.token }}"
+            }
+          ]
+        }
+      },
+      "id": "f56304ed-1783-40c7-9d47-df7e718e7c72",
+      "name": "Look up pending draft",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        224
+      ],
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table from the dataTableId dropdown after import. Filters to only rows still in 'pending' status - prevents double-processing if a link is clicked twice."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-found-1",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9ed7617d-5674-49d5-9d9a-32dd624e47ff",
+      "name": "Draft still pending?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -608,
+        224
+      ],
+      "notes": "If no row comes back, either the token is invalid/expired or this draft was already approved/rejected by an earlier click."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "This link is no longer valid - it may have already been used, or the token is incorrect.",
+        "options": {}
+      },
+      "id": "0c6895bc-db84-4c11-a944-3f87f85e57cb",
+      "name": "Respond - invalid or already used",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        -416,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-approved-1",
+              "leftValue": "={{ $('Webhook - Approve/Reject click').first().json.query.approved }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3bc92b79-0f7c-4a0a-a356-6355dedc0641",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -416,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://thebabelgroup.app.n8n.cloud/webhook/send-client-email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, contactEmail: $json.contactEmail, subject: 'Checking in', body: $json.draftEmail }) }}",
+        "options": {}
+      },
+      "id": "e24a22e9-fb7f-47fd-bf2e-6efc658ee6aa",
+      "name": "Send approved email to client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -208,
+        64
+      ],
+      "notes": "Calls the existing 'send-client-email' webhook workflow. Update YOUR-N8N-INSTANCE.example.com to your real n8n domain."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Approve/Reject click').first().json.query.token }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "sent",
+            "sentToEmail": "={{ $('Look up pending draft').item.json.firstName }}",
+            "approvalEmail": "={{ $json.properties.hs_email_from_email }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "token",
+              "displayName": "token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "contactId",
+              "displayName": "contactId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "draftEmail",
+              "displayName": "draftEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "approvalEmail",
+              "displayName": "approvalEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sentToEmail",
+              "displayName": "sentToEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "54c4af5d-172e-4c67-bceb-ba17ec085391",
+      "name": "Mark as sent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        544,
+        0
+      ],
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table after import."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Approve/Reject click').first().json.query.token }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "rejected"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "token",
+              "displayName": "token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contactId",
+              "displayName": "contactId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "draftEmail",
+              "displayName": "draftEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "13212a06-3566-4531-9e6e-98ddbd0df5c7",
+      "name": "Mark as rejected",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        224
+      ],
+      "alwaysOutputData": true,
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table after import. Future iteration: could route back into the main workflow's LLM node with feedback for a re-draft instead of just marking rejected."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Thanks - this email has been approved and sent to the client.",
+        "options": {}
+      },
+      "id": "52b73cd2-201e-48d0-81d6-9944d4cca98e",
+      "name": "Respond - approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c2b1d3cd-e63e-4478-800f-9516577456a8",
+      "name": "Respond - correction form",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        336
+      ],
+      "notes": "Verify the HTML node's output field name matches '$json.html' here - if it outputs under a different key, update this expression to match."
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Edit Draft Email</title>\n\n  <!-- Quill Rich Text Editor -->\n  <link\n    href=\"https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css\"\n    rel=\"stylesheet\"\n  >\n\n  <style>\n    body {\n      font-family: Arial, Helvetica, sans-serif;\n      background: #f7f7f7;\n      padding: 30px;\n      color: #222;\n    }\n\n    .container {\n      max-width: 800px;\n      margin: 0 auto;\n      background: #fff;\n      padding: 25px;\n      border-radius: 8px;\n      box-shadow: 0 2px 10px rgba(0,0,0,0.08);\n    }\n\n    .info-row {\n      margin-bottom: 10px;\n      font-size: 14px;\n    }\n\n    .label {\n      font-weight: 600;\n      margin-right: 5px;\n    }\n\n    .editor-label {\n      display: block;\n      margin-top: 25px;\n      margin-bottom: 8px;\n      font-weight: 600;\n    }\n\n    #editor {\n      min-height: 350px;\n      background: #fff;\n    }\n\n    .ql-editor {\n      min-height: 350px;\n      font-size: 15px;\n      line-height: 1.5;\n    }\n\n    button {\n      margin-top: 20px;\n      padding: 10px 20px;\n      border: 0;\n      border-radius: 5px;\n      background: #2f5d50;\n      color: white;\n      font-size: 15px;\n      cursor: pointer;\n    }\n\n    button:hover {\n      opacity: 0.9;\n    }\n  </style>\n</head>\n\n<body>\n\n<div class=\"container\">\n\n  <div class=\"info-row\">\n    <span class=\"label\">Contact ID:</span>\n    <b>{{ $node[\"Look up pending draft\"].json.contactId }}</b>\n  </div>\n<div class=\"info-row\">\n  <span class=\"label\">Contact ID:</span>\n  <b>{{ $node[\"Look up pending draft\"].json.contactId }}</b>\n</div>\n\n<div class=\"info-row\">\n  <span class=\"label\">Email:</span>\n  <b>{{ $node[\"Look up pending draft\"].json.contactEmail }}</b>\n</div>\n\n<form\n  method=\"POST\"\n  action=\"https://thebabelgroup.app.n8n.cloud/webhook/update-draft\"\n  onsubmit=\"prepareSubmit()\"\n>\n\n  <input\n    type=\"hidden\"\n    name=\"contactId\"\n    value='{{ $node[\"Look up pending draft\"].json.contactId }}'\n  >\n\n  <input\n    type=\"hidden\"\n    name=\"contactEmail\"\n    value='{{ $node[\"Look up pending draft\"].json.contactEmail }}'\n  >\n  <input\n    type=\"hidden\"\n    name=\"token\"\n    value='{{ $node[\"Look up pending draft\"].json.token }}'\n  >\n\n\n  <input\n    type=\"hidden\"\n    name=\"draftEmail\"\n    id=\"draftEmail\"\n  >\n    <label class=\"editor-label\">\n      Draft Email\n    </label>\n\n    <div id=\"editor\"></div>\n\n    <button type=\"submit\">\n      Update Draft Email\n    </button>\n\n  </form>\n\n</div>\n\n<script src=\"https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js\"></script>\n\n<script>\n  const quill = new Quill('#editor', {\n    theme: 'snow',\n\n    modules: {\n      toolbar: [\n        ['bold', 'italic', 'underline'],\n        [{ 'header': [1, 2, 3, false] }],\n        [{ 'list': 'ordered' }, { 'list': 'bullet' }],\n        ['link', 'image'],\n        [{ 'align': [] }],\n        ['clean']\n      ]\n    }\n  });\n\n  /*\n   * Put your existing HTML email into the editor.\n   *\n   * IMPORTANT:\n   * Do not put HTML directly inside a textarea.\n   * Quill renders it visually and preserves the HTML.\n   */\nconst existingEmail = {{ JSON.stringify($node[\"Look up pending draft\"].json.draftEmail || \"\") }};\n  \n  quill.clipboard.dangerouslyPasteHTML(existingEmail);\n\n  /*\n   * Before submitting the form, copy the editor HTML\n   * into the hidden field sent back to n8n.\n   */\n  function prepareSubmit() {\n    document.getElementById('draftEmail').value =\n      quill.root.innerHTML;\n  }\n</script>\n\n</body>\n</html>\n"
+      },
+      "id": "a0683987-88ea-40ce-8e0b-4fe59bf3901c",
+      "name": "Update Email to Send",
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        336
+      ],
+      "notes": "Renders an editable form pre-filled with the rejected draft, pulling straight from 'Look up pending draft' (the pre-edit original) rather than whatever 'Mark as rejected' returns, to avoid uncertainty about the Data Table update operation's output shape. Update YOUR-N8N-INSTANCE.example.com to your real n8n domain. Check this node's output field name (likely 'html') matches what 'Respond - correction form' references."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the HubSpot email activity from the approved draft.\n// Pull from Look up pending draft because the preceding HTTP Request node\n// returns the send-client-email webhook response, not necessarily the original fields.\nconst draft = $('Look up pending draft').first().json;\n\nreturn [{\n  json: {\n    contactId: draft.contactId,\n    contactEmail: draft.contactEmail,\n    subject: 'Following up on your open items',\n    body: draft.draftEmail,\n    sentAt: new Date().toISOString(),\n    fromEmail: 'rachel@thebabelgroup.com'\n  }\n}];"
+      },
+      "id": "79fa4912-d115-4702-b378-f831c3681265",
+      "name": "Prepare HubSpot Sent Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "Runs only after the send-client-email webhook succeeds. Rebuilds the exact client/contact fields needed for the HubSpot Email engagement."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/emails",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  properties: {\n    hs_timestamp: $('Prepare HubSpot Sent Email').first().json.sentAt,\n    hubspot_owner_id: String($('Get HubSpot Owner').first().json.results[0].id),\n    hs_email_direction: 'EMAIL',\n    hs_email_status: 'SENT',\n    hs_email_subject: $('Prepare HubSpot Sent Email').first().json.subject,\n    hs_email_html: $('Prepare HubSpot Sent Email').first().json.body,\n    hs_email_from_email: $('Prepare HubSpot Sent Email').first().json.fromEmail,\n    hs_email_to_email: $('Prepare HubSpot Sent Email').first().json.contactEmail\n  },\n  associations: [\n    {\n      to: {\n        id: String($('Prepare HubSpot Sent Email').first().json.contactId)\n      },\n      types: [\n        {\n          associationCategory: 'HUBSPOT_DEFINED',\n          associationTypeId: 198\n        }\n      ]\n    }\n  ]\n}) }}",
+        "options": {}
+      },
+      "id": "264142dd-ad66-4c22-867d-78a45282bfcf",
+      "name": "Log Client Email in HubSpot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        0
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "rLp1mkGf05srcGap",
+          "name": "HubSpot Service Key account"
+        }
+      },
+      "notes": "FIXED: owner lookup replaces incoming $json. This node now reads email/contact data from Prepare HubSpot Sent Email and owner ID from Get Rachel HubSpot Owner."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Approve/Reject click').first().json.query.token }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sentToEmail": "={{ $('Look up pending draft').item.json.contactEmail }}",
+            "status": "Rejected then Approved"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "token",
+              "displayName": "token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "contactId",
+              "displayName": "contactId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "draftEmail",
+              "displayName": "draftEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "approvalEmail",
+              "displayName": "approvalEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "sentToEmail",
+              "displayName": "sentToEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "9e554867-752f-4199-8ad1-939286dab9e2",
+      "name": "Mark as sent1",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        256,
+        592
+      ],
+      "disabled": true,
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table after import."
+    },
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/owners/2026-03",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Prepare HubSpot Sent Email').first().json.fromEmail }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        192,
+        0
+      ],
+      "id": "b5fc4ae2-3af1-4a41-8b0a-7896cf827496",
+      "name": "Get HubSpot Owner",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "rLp1mkGf05srcGap",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Approve/Reject click": {
+      "main": [
+        [
+          {
+            "node": "Look up pending draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up pending draft": {
+      "main": [
+        [
+          {
+            "node": "Draft still pending?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft still pending?": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - invalid or already used",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Send approved email to client",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send approved email to client": {
+      "main": [
+        [
+          {
+            "node": "Prepare HubSpot Sent Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as sent": {
+      "main": [
+        [
+          {
+            "node": "Respond - approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as rejected": {
+      "main": [
+        [
+          {
+            "node": "Update Email to Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Email to Send": {
+      "main": [
+        [
+          {
+            "node": "Respond - correction form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare HubSpot Sent Email": {
+      "main": [
+        [
+          {
+            "node": "Get HubSpot Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Client Email in HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Mark as sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as sent1": {
+      "main": [
+        []
+      ]
+    },
+    "Get HubSpot Owner": {
+      "main": [
+        [
+          {
+            "node": "Log Client Email in HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8c6ae4b3-c699-41de-8a63-78b825694983",
+  "meta": {
+    "instanceId": "1a55c0017f5fc37e8b49d3de22165cc4c4ff40d2145ef8b189fbf9931fa6a905"
+  },
+  "nodeGroups": [],
+  "id": "SEbZuXWrMRUA95Wn",
+  "tags": []
+}

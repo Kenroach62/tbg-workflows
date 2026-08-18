@@ -1,0 +1,166 @@
+{
+  "name": "Send client email - Live",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-client-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7516e1ae-afcb-4a13-946a-77e815f2d50c",
+      "name": "Webhook - Receive approved draft",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -656,
+        80
+      ],
+      "webhookId": "9c272576-ffea-4235-bb6b-2a9c1d3e212d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-email-1",
+              "leftValue": "={{ $json.body.contactEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "02d7c726-3a68-4ce9-9bf8-1f4ab743f01b",
+      "name": "Has recipient email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"sent\", contactId: $('Webhook - Receive approved draft').item.json.body.contactId }) }}",
+        "options": {}
+      },
+      "id": "a6d63ac7-de26-430f-bf93-3821d5475c1d",
+      "name": "Respond - sent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"error\", message: \"Missing contactEmail in payload\" }) }}",
+        "options": {}
+      },
+      "id": "53741e15-1622-4e20-af1a-d7b52dd74675",
+      "name": "Respond - error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook - Receive approved draft').item.json.body.contactEmail }}",
+        "subject": "=Checking In",
+        "message": "={{ $('Webhook - Receive approved draft').item.json.body.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -224,
+        80
+      ],
+      "id": "0f6388c6-d2b5-4bae-8737-0f08e12700b4",
+      "name": "Send a message",
+      "webhookId": "f2e47301-e6b8-4a50-b66e-685ececb0908",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Z7cy5LBLtgw4KfP1",
+          "name": "Rachels Gmail"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Receive approved draft": {
+      "main": [
+        [
+          {
+            "node": "Has recipient email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has recipient email?": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond - sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "61cf608e-3e72-4432-a540-25e5f6082258",
+  "meta": {
+    "instanceId": "1a55c0017f5fc37e8b49d3de22165cc4c4ff40d2145ef8b189fbf9931fa6a905"
+  },
+  "nodeGroups": [],
+  "id": "tuweerylz4xCOsbF",
+  "tags": []
+}
