@@ -1,0 +1,297 @@
+{
+  "name": "Send client email - Live",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-client-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7516e1ae-afcb-4a13-946a-77e815f2d50c",
+      "name": "Webhook - Receive approved draft",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        80
+      ],
+      "webhookId": "9c272576-ffea-4235-bb6b-2a9c1d3e212d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-has-email-1",
+              "leftValue": "={{ $json.body.contactEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "02d7c726-3a68-4ce9-9bf8-1f4ab743f01b",
+      "name": "Has recipient email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -672,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"sent\", contactId: $('Webhook - Receive approved draft').item.json.body.contactId }) }}",
+        "options": {}
+      },
+      "id": "a6d63ac7-de26-430f-bf93-3821d5475c1d",
+      "name": "Respond - sent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"error\", message: \"Missing contactEmail in payload\" }) }}",
+        "options": {}
+      },
+      "id": "53741e15-1622-4e20-af1a-d7b52dd74675",
+      "name": "Respond - error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook - Receive approved draft').item.json.body.contactEmail }}",
+        "subject": "=Checking In",
+        "message": "={{ $('Webhook - Receive approved draft').item.json.body.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        -16
+      ],
+      "id": "0f6388c6-d2b5-4bae-8737-0f08e12700b4",
+      "name": "Send a message",
+      "webhookId": "f2e47301-e6b8-4a50-b66e-685ececb0908",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Z7cy5LBLtgw4KfP1",
+          "name": "Rachels Gmail"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/emails",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  properties: {\n    hs_timestamp: new Date().toISOString(),\n    hubspot_owner_id: String($('Get HubSpot Owner').first().json.results[0].id),\n    hs_email_direction: 'EMAIL',\n    hs_email_status: 'SENT',\n    hs_email_subject: $('Webhook - Receive approved draft').first().json.body.subject,\n    hs_email_html: $('Webhook - Receive approved draft').first().json.body.body,\n    hs_email_from_email: $('Webhook - Receive approved draft').first().json.body.fromEmail || 'rachel@thebabelgroup.com',\n    hs_email_to_email: $('Webhook - Receive approved draft').first().json.body.contactEmail || 'rachel@thebabelgroup.com'\n  },\n  associations: [\n    {\n      to: {\n        id: String($('Webhook - Receive approved draft').first().json.body.contactId)\n      },\n      types: [\n        {\n          associationCategory: 'HUBSPOT_DEFINED',\n          associationTypeId: 198\n        }\n      ]\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "338a624f-d114-45e4-af3e-0d1cd4b693df",
+      "name": "Log Client Email in HubSpot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        -16
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "rLp1mkGf05srcGap",
+          "name": "HubSpot Service Key account"
+        }
+      },
+      "notes": "FIXED: owner lookup replaces incoming $json. This node now reads email/contact data from Prepare HubSpot Sent Email and owner ID from Get Rachel HubSpot Owner."
+    },
+    {
+      "parameters": {
+        "url": "https://api.hubapi.com/crm/owners/2026-03",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "hubspotAppToken",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "email",
+              "value": "={{ $('Webhook - Receive approved draft').item.json.body.approvalEmail || 'rachel@thebabelgroup.com' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -48,
+        -16
+      ],
+      "id": "1edf19e8-7d2a-478f-bc24-395dc98b44d4",
+      "name": "Get HubSpot Owner",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "rLp1mkGf05srcGap",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $json.body.token }}"
+            },
+            {
+              "keyName": "status",
+              "keyValue": "pending"
+            },
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Approve/Reject click').first().json.query.token }}"
+            }
+          ]
+        }
+      },
+      "id": "152058b7-6fab-481c-98b7-d911937cac86",
+      "name": "Look up token informaion",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -144
+      ],
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table from the dataTableId dropdown after import. Filters to only rows still in 'pending' status - prevents double-processing if a link is clicked twice."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Receive approved draft": {
+      "main": [
+        [
+          {
+            "node": "Has recipient email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has recipient email?": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond - error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Get HubSpot Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get HubSpot Owner": {
+      "main": [
+        [
+          {
+            "node": "Log Client Email in HubSpot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Client Email in HubSpot": {
+      "main": [
+        [
+          {
+            "node": "Respond - sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up token informaion": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5a02b0d6-bc41-4f50-8c34-5bc84e49169b",
+  "meta": {
+    "instanceId": "1a55c0017f5fc37e8b49d3de22165cc4c4ff40d2145ef8b189fbf9931fa6a905"
+  },
+  "nodeGroups": [],
+  "id": "tuweerylz4xCOsbF",
+  "tags": []
+}

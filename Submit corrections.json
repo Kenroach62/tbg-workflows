@@ -54,7 +54,7 @@
         "url": "https://thebabelgroup.app.n8n.cloud/webhook/send-client-email",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, contactEmail: $json.contactEmail, subject: 'Checking in', body: $('Webhook - Submit correction').first().json.body.draftEmail }) }}\n",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, contactEmail: $json.contactEmail, subject: 'Checking in', body: $('Webhook - Submit correction').first().json.body.draftEmail, token: $json.token  }) }}\n",
         "options": {}
       },
       "id": "e618c83d-4e34-45cd-bd3f-94f76d5784c7",
@@ -258,7 +258,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "563d5881-5e98-4014-9f1d-ab54e5ba0802",
+  "versionId": "ed4cb5cf-99b4-43ab-82a7-ce958107520e",
   "meta": {
     "instanceId": "1a55c0017f5fc37e8b49d3de22165cc4c4ff40d2145ef8b189fbf9931fa6a905"
   },
