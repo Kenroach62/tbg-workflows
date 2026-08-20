@@ -1,0 +1,324 @@
+TBG n8n Workflows
+
+This repository contains the n8n workflows used for The Babel Group's HubSpot follow-up email automation.
+
+Overview
+
+The workflow set automates the process of retrieving HubSpot deals, generating consolidated follow-up email drafts, routing drafts for human approval or correction, sending approved emails through Gmail, and recording the resulting activity.
+
+Workflows
+
+1. HubSpot Consolidated Follow-up Emails - deepseek
+
+File: HubSpot Consolidated Follow-up Emails - deepseek(2).json
+
+This is the primary workflow.
+
+It:
+
+Runs from an n8n schedule trigger.
+
+Retrieves HubSpot deals and deal pipelines.
+
+Converts HubSpot pipeline stage IDs into human-readable stage names.
+
+Reads the Global Rules, Content Grid, Product Priority, and Resource Links from the supporting workbook.
+
+Groups deals by associated HubSpot contact.
+
+Filters deals to supported follow-up stages.
+
+Retrieves contact names and email addresses from HubSpot.
+
+Uses DeepSeek to generate a consolidated follow-up email.
+
+Generates an approval token.
+
+Stores the draft in the pending_approvals n8n Data Table.
+
+Sends the draft for review before the client email is sent.
+
+The supported Content Grid stages in the workflow are:
+
+Qualified to Explore
+
+Demo
+
+Trial
+
+Due Diligence
+
+Quote Requested
+
+2. Approval webhook receiver - HubSpot Logging
+
+File: Approval webhook receiver - HubSpot Logging(1).json
+
+Handles approval and rejection of generated drafts.
+
+The workflow exposes the approve-followup webhook and looks up the corresponding record in the pending_approvals Data Table.
+
+If approved, it:
+
+Sends the approved draft to the client-email workflow.
+
+Prepares the sent-email information.
+
+Logs the email activity in HubSpot.
+
+Updates the approval record to indicate that the email was sent.
+
+Returns an approval confirmation.
+
+If rejected, it:
+
+Marks the draft as rejected.
+
+Displays an HTML/Quill editor containing the current draft.
+
+Allows the reviewer to edit the email.
+
+Submits the corrected draft to the update-draft webhook.
+
+The workflow also prevents an already-used or invalid approval token from being processed again.
+
+3. Submit corrections
+
+File: Submit corrections.json
+
+Receives edited drafts from the correction form through:
+
+POST /webhook/update-draft
+
+The workflow:
+
+Reads the approval token from the submitted form.
+
+Looks up the corresponding draft.
+
+Sends the corrected email to the client-email workflow.
+
+Updates the pending_approvals record.
+
+Stores the corrected email text.
+
+Marks the record as sent.
+
+Returns confirmation to the reviewer.
+
+4. Send client email - Live
+
+File: Send client email - Live.json
+
+This workflow provides the email-sending endpoint:
+
+POST /webhook/send-client-email
+
+It:
+
+Receives the contact ID, recipient email address, subject, and HTML body.
+
+Verifies that a recipient email address exists.
+
+Sends the message using the configured Gmail credential.
+
+Returns a JSON success response.
+
+If contactEmail is missing, the workflow returns an error response rather than attempting to send the message.
+
+Workflow Architecture
+
+Scheduled Trigger
+      |
+      v
+HubSpot Deals + Pipelines
+      |
+      v
+Load Content Rules / Resources
+      |
+      v
+Group Deals by Contact
+      |
+      v
+Filter Supported Stages
+      |
+      v
+Get HubSpot Contact Information
+      |
+      v
+DeepSeek Generates Draft
+      |
+      v
+Generate Approval Token
+      |
+      v
+pending_approvals Data Table
+      |
+      v
+Send Draft for Human Review
+      |
+      +-------------------------+
+      |                         |
+   APPROVE                   REJECT
+      |                         |
+      v                         v
+Send Client Email        Quill Edit Form
+      |                         |
+      v                         v
+Log in HubSpot          Submit Corrections
+      |                         |
+      v                         v
+Mark Sent              Send Corrected Email
+                                |
+                                v
+                           Mark Sent
+
+Required Services
+
+These workflows depend on:
+
+n8n
+
+HubSpot
+
+Gmail
+
+DeepSeek
+
+n8n Data Tables
+
+A spreadsheet/workbook containing the email content rules and resources
+
+n8n Data Table
+
+The approval process uses the n8n Data Table:
+
+pending_approvals
+
+The workflows reference fields including:
+
+token
+
+status
+
+contactId
+
+contactEmail
+
+firstName
+
+draftEmail
+
+approvalEmail
+
+sentToEmail
+
+After importing the workflows into another n8n instance, re-select the pending_approvals Data Table in nodes where the imported table ID does not resolve.
+
+Webhooks
+
+Purpose
+
+Method
+
+Path
+
+Approve/reject a draft
+
+GET
+
+/webhook/approve-followup
+
+Submit an edited draft
+
+POST
+
+/webhook/update-draft
+
+Send an approved client email
+
+POST
+
+/webhook/send-client-email
+
+The workflows containing these production webhooks must be active for their production URLs to work.
+
+Credentials and Configuration
+
+After importing the workflows, verify the credentials and instance-specific resources used by:
+
+HubSpot HTTP Request nodes
+
+Gmail
+
+DeepSeek
+
+Spreadsheet/file access
+
+n8n Data Tables
+
+Do not commit API keys, OAuth secrets, passwords, access tokens, or other secrets to Git.
+
+Credential IDs stored in exported n8n workflow JSON are instance-specific references and may need to be re-selected after importing the workflow into another n8n instance.
+
+Importing the Workflows
+
+In n8n:
+
+Create or open a workflow.
+
+Choose Import from File.
+
+Select the desired JSON workflow.
+
+Reconnect credentials where necessary.
+
+Re-select the pending_approvals Data Table where required.
+
+Verify webhook URLs.
+
+Test the workflow.
+
+Activate workflows that expose production webhooks.
+
+Git Backup
+
+Export all workflows from the Docker container:
+
+docker exec n8n n8n export:workflow --backup --output=/tmp/workflows/
+
+Copy them to Windows:
+
+docker cp n8n:/tmp/workflows/. C:\tmp\workflows\
+
+Commit the exported workflows:
+
+cd C:\tmp\workflows
+git add .
+git commit -m "Update n8n workflows"
+git push
+
+Security
+
+Before pushing workflow exports to a public repository:
+
+Review workflow JSON for hard-coded secrets.
+
+Never commit .env files.
+
+Never commit API keys or OAuth client secrets.
+
+Never commit passwords or private tokens.
+
+Prefer a private Git repository for production workflow backups.
+
+A basic .gitignore can include:
+
+.env
+*.env
+credentials*
+secrets*
+
+Repository Purpose
+
+The repository provides version-controlled backups of the n8n automation and makes it possible to track workflow changes, restore previous versions, and move workflows between n8n environments.
