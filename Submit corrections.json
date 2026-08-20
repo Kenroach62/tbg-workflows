@@ -1,0 +1,268 @@
+{
+  "name": "Submit corrections",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "update-draft",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "92f9ef6b-ceb1-4f87-8ceb-024b1393136a",
+      "name": "Webhook - Submit correction",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "update-draft",
+      "notes": "Separate always-on webhook the correction form submits to. Must ALSO be activated as part of this workflow (same activation toggle covers all webhook nodes in one workflow)."
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $json.body.token }}"
+            }
+          ]
+        }
+      },
+      "id": "2eb76c0e-fde5-4bcf-87e1-56bde86d2019",
+      "name": "Look up draft for correction",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        208,
+        0
+      ],
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table after import if the ID doesn't resolve. Note: does NOT filter by status='pending' here, since this draft was already marked 'rejected' - we WANT to act on it again after correction."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://thebabelgroup.app.n8n.cloud/webhook/send-client-email",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contactId: $json.contactId, contactEmail: $json.contactEmail, subject: 'Checking in', body: $('Webhook - Submit correction').first().json.body.draftEmail, token: $json.token  }) }}\n",
+        "options": {}
+      },
+      "id": "e618c83d-4e34-45cd-bd3f-94f76d5784c7",
+      "name": "Send corrected email to client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        0
+      ],
+      "notes": "Sends the EDITED text from the correction form (not the original rejected draft). Update YOUR-N8N-INSTANCE.example.com to your real n8n domain."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "mbtGWkgDTJjOMuqX",
+          "mode": "list",
+          "cachedResultName": "pending_approvals",
+          "cachedResultUrl": "/projects/H4s9VMBoonMJhOtz/datatables/mbtGWkgDTJjOMuqX"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "token",
+              "keyValue": "={{ $('Webhook - Submit correction').first().json.body.token }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "sent",
+            "draftEmail": "={{ $('Webhook - Submit correction').first().json.body.draftEmail }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "token",
+              "displayName": "token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "contactId",
+              "displayName": "contactId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "contactEmail",
+              "displayName": "contactEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "draftEmail",
+              "displayName": "draftEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "approvalEmail",
+              "displayName": "approvalEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sentToEmail",
+              "displayName": "sentToEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b95b233a-1572-48b6-b33a-31e8cc356ec7",
+      "name": "Mark corrected as sent",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        624,
+        0
+      ],
+      "notes": "REQUIRES MANUAL SETUP: re-select the 'pending_approvals' table after import. Also updates draftEmail to the corrected text so the record reflects what was actually sent."
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Thanks - the corrected email has been sent to the client.",
+        "options": {}
+      },
+      "id": "53f826f6-bd74-4310-80e5-5c378dafc564",
+      "name": "Respond - corrected and sent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        832,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Submit correction": {
+      "main": [
+        [
+          {
+            "node": "Look up draft for correction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Look up draft for correction": {
+      "main": [
+        [
+          {
+            "node": "Send corrected email to client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send corrected email to client": {
+      "main": [
+        [
+          {
+            "node": "Mark corrected as sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark corrected as sent": {
+      "main": [
+        [
+          {
+            "node": "Respond - corrected and sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ed4cb5cf-99b4-43ab-82a7-ce958107520e",
+  "meta": {
+    "instanceId": "1a55c0017f5fc37e8b49d3de22165cc4c4ff40d2145ef8b189fbf9931fa6a905"
+  },
+  "nodeGroups": [],
+  "id": "BeSfq7ErxnWnccP8",
+  "tags": []
+}
